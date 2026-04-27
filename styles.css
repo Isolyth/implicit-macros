@@ -1,0 +1,35 @@
+.cm-macro-typing {
+  color: var(--text-accent, #bea3d9);
+  font-style: italic;
+  border-bottom: 1px dashed rgba(190, 163, 217, 0.4);
+}
+
+/* In-flight overlay: the macro range is replaced char-for-char with a
+ * MacroDotsWidget. .cm-macro-dots is the wrapper; .cm-macro-dot is each
+ * per-character braille glyph, animated by JS in macros.ts. */
+.cm-macro-dots {
+  color: var(--text-accent, #bea3d9);
+  font-style: normal;
+}
+
+.cm-macro-dot {
+  display: inline-block;
+  text-align: center;
+}
+
+/* Cooldown: each freshly inserted chunk gets an accent-tinted background
+ * highlight that fades to transparent over COOLING_DURATION_MS (mirrored
+ * in macros.ts). Background-color is not inherited, so wikilinks and other
+ * accent-colored children inside the cooling range retain their natural
+ * color throughout — no flicker through white when the mark is removed. */
+.cm-macro-cooling {
+  animation: cm-macro-cool 1500ms ease-out forwards;
+  border-radius: 2px;
+  padding: 0 1px;
+  margin: 0 -1px;
+}
+
+@keyframes cm-macro-cool {
+  from { background-color: color-mix(in srgb, var(--text-accent, #bea3d9) 35%, transparent); }
+  to   { background-color: transparent; }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "implicit-macros",
+  "version": "0.1.0",
+  "description": "Obsidian plugin: inline AI macros (!!prompt!).",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+  },
+  "keywords": [
+    "obsidian",
+    "ai",
+    "macros"
+  ],
+  "author": "isolyth",
+  "license": "MIT",
+  "devDependencies": {
+    "@codemirror/language": "^6.10.0",
+    "@codemirror/state": "^6.4.0",
+    "@codemirror/view": "^6.26.0",
+    "@types/node": "^20.0.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.0",
+    "obsidian": "latest",
+    "tslib": "^2.6.0",
+    "typescript": "^5.3.0"
+  }
+}
