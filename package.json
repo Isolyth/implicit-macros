@@ -12,8 +12,8 @@
     "ai",
     "macros"
   ],
-  "author": "isolyth",
-  "license": "MIT",
+  "author": "eriskii",
+  "license": "GPL-3.0-only",
   "devDependencies": {
     "@codemirror/language": "^6.10.0",
     "@codemirror/state": "^6.4.0",

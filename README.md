@@ -52,4 +52,4 @@ The closing delimiter fires the call. The macro is single-line and won't fire in
 
 ## License
 
-MIT
+GPL-3.0-only. Forks must remain open-source under the same license — see `LICENSE`.
