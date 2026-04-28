@@ -93,8 +93,7 @@ class MacroDotsWidget extends WidgetType {
     super();
   }
   toDOM(): HTMLElement {
-    const wrap = document.createElement('span');
-    wrap.className = 'cm-macro-dots';
+    const wrap = createSpan({ cls: 'cm-macro-dots' });
     if (this.width > 0) {
       // Dynamic measured widths come from coordsAtPos at runtime, so they
       // can't live in the stylesheet. Custom properties keep the inline
@@ -103,13 +102,11 @@ class MacroDotsWidget extends WidgetType {
     }
     const dotW = this.width > 0 && this.length > 0 ? this.width / this.length : 0;
     for (let i = 0; i < this.length; i++) {
-      const dot = document.createElement('span');
-      dot.className = 'cm-macro-dot';
+      const dot = wrap.createSpan({ cls: 'cm-macro-dot' });
       if (dotW > 0) {
         dot.style.setProperty('--macro-dot-w', `${dotW.toFixed(3)}px`);
       }
       dot.textContent = BRAILLE_FRAMES[i % BRAILLE_FRAMES.length];
-      wrap.appendChild(dot);
       liveDots.add({ el: dot, offset: i });
     }
     ensureTicker();
