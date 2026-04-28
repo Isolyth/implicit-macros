@@ -48,7 +48,7 @@ export default class ImplicitMacrosPlugin extends Plugin {
     if (raw.apiKeyBlob) this.settings.apiKeyBlob = raw.apiKeyBlob;
 
     if (raw.apiKeyBlob) {
-      const plain = await decryptString(raw.apiKeyBlob);
+      const plain = await decryptString(this.app, raw.apiKeyBlob);
       if (plain !== null) {
         this.settings.apiKey = plain;
       } else {
@@ -75,7 +75,7 @@ export default class ImplicitMacrosPlugin extends Plugin {
       apiKeyBlob: null,
     };
     if (this.settings.apiKey) {
-      persisted.apiKeyBlob = await encryptString(this.settings.apiKey);
+      persisted.apiKeyBlob = await encryptString(this.app, this.settings.apiKey);
       this.settings.apiKeyBlob = persisted.apiKeyBlob;
     } else {
       this.settings.apiKeyBlob = null;
@@ -146,7 +146,7 @@ class MacroSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
         t.inputEl.rows = 6;
-        t.inputEl.style.width = '100%';
+        t.inputEl.addClass('implicit-macros-prompt-textarea');
       });
 
     new Setting(containerEl)
@@ -163,7 +163,7 @@ class MacroSettingTab extends PluginSettingTab {
           }),
       );
 
-    containerEl.createEl('h3', { text: 'Macro syntax' });
+    new Setting(containerEl).setName('Macro syntax').setHeading();
 
     new Setting(containerEl)
       .setName('Open delimiter')

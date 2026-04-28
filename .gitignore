@@ -4,3 +4,5 @@ main.js
 .DS_Store
 data.json
 .npm-cache/
+CLAUDE.md
+.submission-snippet.json

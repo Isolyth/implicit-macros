@@ -1,9 +1,11 @@
+import type { App } from 'obsidian';
+
 // AES-GCM at-rest encryption for the API key.
 //
 // The encryption key is a 32-byte random value generated on first use and
-// kept in the renderer's localStorage. localStorage lives in Electron's
-// per-app data directory (not in the vault), so it never travels with the
-// vault — `data.json` ends up holding only ciphertext.
+// kept via Obsidian's `app.{load,save}LocalStorage`, which is a vault-scoped
+// wrapper over the Electron renderer's localStorage (per-app data dir, NOT
+// in the vault). So `data.json` ends up holding only ciphertext.
 //
 // Threat model: protect against accidental disclosure (vault sync, cloud
 // backups, screenshots of `data.json`, casual inspection of synced files).
@@ -36,13 +38,13 @@ function fromBase64(s: string): Uint8Array {
 
 let cachedKey: CryptoKey | null = null;
 
-async function getKey(): Promise<CryptoKey> {
+async function getKey(app: App): Promise<CryptoKey> {
   if (cachedKey) return cachedKey;
-  let raw = localStorage.getItem(KEY_STORAGE);
+  const raw = app.loadLocalStorage(KEY_STORAGE);
   let bytes: Uint8Array;
-  if (!raw) {
+  if (typeof raw !== 'string' || raw.length === 0) {
     bytes = crypto.getRandomValues(new Uint8Array(KEY_BITS / 8));
-    localStorage.setItem(KEY_STORAGE, toBase64(bytes));
+    app.saveLocalStorage(KEY_STORAGE, toBase64(bytes));
   } else {
     bytes = fromBase64(raw);
   }
@@ -56,8 +58,8 @@ async function getKey(): Promise<CryptoKey> {
   return cachedKey;
 }
 
-export async function encryptString(plain: string): Promise<EncryptedBlob> {
-  const key = await getKey();
+export async function encryptString(app: App, plain: string): Promise<EncryptedBlob> {
+  const key = await getKey(app);
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const ct = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: iv as BufferSource },
@@ -69,9 +71,9 @@ export async function encryptString(plain: string): Promise<EncryptedBlob> {
 
 // Returns the plaintext on success, or null if the blob can't be decrypted
 // on this device (key was rotated / vault was copied to a new device).
-export async function decryptString(blob: EncryptedBlob): Promise<string | null> {
+export async function decryptString(app: App, blob: EncryptedBlob): Promise<string | null> {
   try {
-    const key = await getKey();
+    const key = await getKey(app);
     const iv = fromBase64(blob.iv);
     const ct = fromBase64(blob.ct);
     const pt = await crypto.subtle.decrypt(

@@ -6,8 +6,9 @@ import {
   ViewUpdate,
   WidgetType,
 } from '@codemirror/view';
-import { EditorState, Extension, StateEffect, StateField } from '@codemirror/state';
+import { EditorState, Extension, Range, StateEffect, StateField } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
+import { SyntaxNode } from '@lezer/common';
 import { StreamCallbacks, StreamHandle } from './api';
 
 // Hooks the plugin supplies to the editor extension. Keeps macros.ts free of
@@ -36,7 +37,7 @@ const CODE_CONTEXT_NODES = new Set([
 ]);
 
 function insideCode(state: EditorState, pos: number): boolean {
-  let node: any = syntaxTree(state).resolveInner(pos, 1);
+  let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1);
   while (node) {
     if (CODE_CONTEXT_NODES.has(node.name)) return true;
     node = node.parent;
@@ -95,17 +96,17 @@ class MacroDotsWidget extends WidgetType {
     const wrap = document.createElement('span');
     wrap.className = 'cm-macro-dots';
     if (this.width > 0) {
-      wrap.style.display = 'inline-block';
-      wrap.style.width = `${this.width.toFixed(2)}px`;
+      // Dynamic measured widths come from coordsAtPos at runtime, so they
+      // can't live in the stylesheet. Custom properties keep the inline
+      // surface narrow (one declaration the CSS can pick up).
+      wrap.style.setProperty('--macro-dots-w', `${this.width.toFixed(2)}px`);
     }
     const dotW = this.width > 0 && this.length > 0 ? this.width / this.length : 0;
     for (let i = 0; i < this.length; i++) {
       const dot = document.createElement('span');
       dot.className = 'cm-macro-dot';
       if (dotW > 0) {
-        dot.style.display = 'inline-block';
-        dot.style.width = `${dotW.toFixed(3)}px`;
-        dot.style.textAlign = 'center';
+        dot.style.setProperty('--macro-dot-w', `${dotW.toFixed(3)}px`);
       }
       dot.textContent = BRAILLE_FRAMES[i % BRAILLE_FRAMES.length];
       wrap.appendChild(dot);
@@ -388,8 +389,6 @@ function fireMacro(hooks: MacroHooks, view: EditorView, fire: MacroFire): void {
 
   let phase: 'pending' | 'streaming' | 'done' = 'pending';
   let handle: StreamHandle | null = null;
-  let firstDeltaTime: number | null = null;
-  const startTime = Date.now();
 
   const scheduleCooldown = (coolId: string): void => {
     window.setTimeout(() => {
@@ -459,17 +458,10 @@ function fireMacro(hooks: MacroHooks, view: EditorView, fire: MacroFire): void {
   handle = hooks.stream(fire.prompt, fire.context, {
     onDelta(delta: string) {
       if (phase === 'done') return;
-      if (firstDeltaTime === null) {
-        firstDeltaTime = Date.now();
-        console.log(
-          `[implicit-macros] first delta +${firstDeltaTime - startTime}ms: ${delta.length} chars`,
-        );
-      }
       applyText(delta);
     },
     onDone(_full: string) {
       if (phase === 'done') return;
-      console.log(`[implicit-macros] onDone +${Date.now() - startTime}ms`);
       if (phase === 'pending') {
         dropMacro(view, id);
         hooks.notify('Macro: empty response');
@@ -502,7 +494,6 @@ function fireMacro(hooks: MacroHooks, view: EditorView, fire: MacroFire): void {
     },
     onError(err: Error) {
       if (phase === 'done') return;
-      console.log(`[implicit-macros] onError +${Date.now() - startTime}ms:`, err.message);
       if (phase === 'pending') {
         dropMacro(view, id);
       } else {
@@ -625,7 +616,7 @@ function makeCoolingPlugin() {
       build(view: EditorView): DecorationSet {
         const cooling = view.state.field(coolingField, false);
         if (!cooling || cooling.size === 0) return Decoration.none;
-        const ranges: any[] = [];
+        const ranges: Range<Decoration>[] = [];
         // Mark.range requires ascending order; sort by from.
         const entries = [...cooling.values()].sort((a, b) => a.from - b.from);
         for (const r of entries) {
@@ -656,7 +647,7 @@ function makeMacroOverlayPlugin() {
       build(view: EditorView): DecorationSet {
         const active = view.state.field(activeMacrosField, false);
         if (!active || active.size === 0) return Decoration.none;
-        const ranges: any[] = [];
+        const ranges: Range<Decoration>[] = [];
         for (const [id, r] of active) {
           if (r.from >= r.to) continue;
           ranges.push(

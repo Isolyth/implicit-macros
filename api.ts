@@ -1,12 +1,9 @@
 import { DEFAULT_SYSTEM_PROMPT, MacroSettings } from './settings';
 
-// We use Node's https/http directly (via `require`) instead of Obsidian's
-// `requestUrl` because requestUrl buffers the full response and doesn't
-// expose the underlying stream. Going through Node also dodges browser CORS:
-// OpenAI's API does not allow direct browser-origin calls, but a Node-level
-// HTTPS request from inside Electron is indistinguishable from any other
-// server-to-server call. Module names are externalized in esbuild, so they
-// resolve to Electron's runtime Node modules.
+// We use the platform `fetch` (not Obsidian's `requestUrl`) because we need
+// the response as a ReadableStream — `requestUrl` buffers the full body and
+// drops the streaming. `fetch` is available on both desktop and mobile, so
+// the plugin works in either environment.
 
 export interface StreamCallbacks {
   // Called for every non-empty delta as it arrives.
@@ -42,17 +39,13 @@ export function streamMacro(
   const system = settings.systemPrompt || DEFAULT_SYSTEM_PROMPT;
 
   const baseUrl = settings.baseUrl.replace(/\/$/, '');
-  let url: URL;
+  let url: string;
   try {
-    url = new URL(`${baseUrl}/chat/completions`);
+    url = new URL(`${baseUrl}/chat/completions`).toString();
   } catch {
     cb.onError(new Error('Invalid base URL'));
     return { abort: () => {} };
   }
-
-  const isHttps = url.protocol === 'https:';
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const lib: any = isHttps ? require('https') : require('http');
 
   const payload = JSON.stringify({
     model: settings.model,
@@ -63,110 +56,100 @@ export function streamMacro(
     ],
   });
 
+  const controller = new AbortController();
   let aborted = false;
   let fullText = '';
-  let req: any = null;
 
-  const options = {
-    method: 'POST',
-    hostname: url.hostname,
-    port: url.port || (isHttps ? 443 : 80),
-    path: url.pathname + url.search,
-    headers: {
-      Authorization: `Bearer ${settings.apiKey}`,
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(payload).toString(),
-      Accept: 'text/event-stream',
-      // Disable any compression that might buffer the response before
-      // delivering it. Some providers/CDNs gzip SSE responses, which
-      // collapses the visible streaming.
-      'Accept-Encoding': 'identity',
-    },
-  };
-
-  req = lib.request(options, (res: any) => {
-    if (res.statusCode >= 400) {
-      let body = '';
-      res.on('data', (chunk: any) => {
-        body += chunk.toString('utf8');
+  void (async () => {
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${settings.apiKey}`,
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
+        body: payload,
+        signal: controller.signal,
       });
-      res.on('end', () => {
-        if (aborted) return;
-        let msg = `HTTP ${res.statusCode}`;
-        try {
-          const j = JSON.parse(body);
-          if (j?.error?.message) msg = j.error.message;
-        } catch {
-          if (body) msg = `${msg}: ${body.slice(0, 200)}`;
-        }
-        cb.onError(new Error(msg));
-      });
+    } catch (err) {
+      if (aborted) return;
+      cb.onError(err instanceof Error ? err : new Error(String(err)));
       return;
     }
 
-    // SSE framing: events separated by '\n\n' (or '\r\n\r\n'), each event
-    // has 'data: <json>' lines. The terminal event is `data: [DONE]`.
-    // Partial chunks accumulate in `buf` until we see a delimiter.
-    let buf = '';
-    let chunkCount = 0;
-    let firstChunkTime: number | null = null;
-    let deltaCount = 0;
-    const startTime = Date.now();
-    res.setEncoding('utf8');
-    res.on('data', (chunk: string) => {
+    if (!res.ok) {
+      let body = '';
+      try {
+        body = await res.text();
+      } catch {
+        // ignore
+      }
       if (aborted) return;
-      chunkCount++;
-      if (firstChunkTime === null) firstChunkTime = Date.now();
-      console.log(
-        `[implicit-macros] chunk #${chunkCount} +${Date.now() - startTime}ms: ${chunk.length} chars`,
-      );
-      // Normalize CRLF to LF so the '\n\n' delimiter check catches both.
-      buf += chunk.replace(/\r\n/g, '\n');
-      let idx;
-      while ((idx = buf.indexOf('\n\n')) !== -1) {
-        const event = buf.slice(0, idx);
-        buf = buf.slice(idx + 2);
-        for (const line of event.split('\n')) {
-          if (!line.startsWith('data:')) continue;
-          const data = line.slice(5).trim();
-          if (data === '[DONE]' || data.length === 0) continue;
-          try {
-            const j = JSON.parse(data);
-            const delta = j?.choices?.[0]?.delta?.content;
-            if (typeof delta === 'string' && delta.length > 0) {
-              fullText += delta;
-              deltaCount++;
-              cb.onDelta(delta);
+      let msg = `HTTP ${res.status}`;
+      try {
+        const j = JSON.parse(body);
+        if (j?.error?.message) msg = j.error.message;
+      } catch {
+        if (body) msg = `${msg}: ${body.slice(0, 200)}`;
+      }
+      cb.onError(new Error(msg));
+      return;
+    }
+
+    if (!res.body) {
+      cb.onError(new Error('Response has no body'));
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buf = '';
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (aborted) return;
+        const chunk = decoder.decode(value, { stream: true });
+        // Normalize CRLF to LF so the '\n\n' delimiter check catches both.
+        buf += chunk.replace(/\r\n/g, '\n');
+        let idx;
+        while ((idx = buf.indexOf('\n\n')) !== -1) {
+          const event = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          for (const line of event.split('\n')) {
+            if (!line.startsWith('data:')) continue;
+            const data = line.slice(5).trim();
+            if (data === '[DONE]' || data.length === 0) continue;
+            try {
+              const j = JSON.parse(data);
+              const delta = j?.choices?.[0]?.delta?.content;
+              if (typeof delta === 'string' && delta.length > 0) {
+                fullText += delta;
+                cb.onDelta(delta);
+              }
+            } catch {
+              // Defensive: skip malformed JSON rather than killing the stream.
             }
-          } catch {
-            // Defensive: skip malformed JSON rather than killing the stream.
           }
         }
       }
-    });
-    res.on('end', () => {
-      console.log(
-        `[implicit-macros] stream ended after ${chunkCount} chunk(s), ${deltaCount} delta(s), ${Date.now() - startTime}ms total`,
-      );
-      if (!aborted) cb.onDone(fullText);
-    });
-    res.on('error', (err: Error) => {
-      if (!aborted) cb.onError(err);
-    });
-  });
+    } catch (err) {
+      if (aborted) return;
+      cb.onError(err instanceof Error ? err : new Error(String(err)));
+      return;
+    }
 
-  req.on('error', (err: Error) => {
-    if (!aborted) cb.onError(err);
-  });
-
-  req.write(payload);
-  req.end();
+    if (!aborted) cb.onDone(fullText);
+  })();
 
   return {
     abort: () => {
       aborted = true;
       try {
-        req?.destroy();
+        controller.abort();
       } catch {
         // ignore — best-effort
       }

@@ -6,7 +6,7 @@ While the call is running, the macro text is replaced with animated braille-dot 
 
 ## Install
 
-This plugin is not in the Obsidian community-plugin directory; install it manually.
+Install via Obsidian's Community Plugins browser (search for **Implicit Macros**), or install from source:
 
 1. Build the plugin from source (see below) — produces `main.js`.
 2. Make sure you have `manifest.json`, `main.js`, and `styles.css`.
@@ -49,6 +49,17 @@ The Idiot is a novel by !!one sentence on its central theme!
 ```
 
 The closing delimiter fires the call. The macro is single-line and won't fire inside fenced code, indented code, or inline backtick spans.
+
+## Data flow and privacy
+
+This plugin sends data to a third-party AI service that **you** configure. Specifically, when a macro fires:
+
+- **What is sent:** the macro prompt itself, plus up to `Context chars` (default 1500) characters of preceding note text, plus the system prompt. Together these become a single chat-completions request.
+- **Where it goes:** the OpenAI-compatible endpoint set in **Base URL** (default `https://api.openai.com/v1`). You can point this at OpenAI, a local server (Ollama, llama.cpp, LM Studio, etc.), or any other compatible provider.
+- **Authentication:** your API key is sent as a `Bearer` token to the configured endpoint and nowhere else. It is encrypted at rest in `data.json` with a per-device AES-256-GCM key.
+- **No telemetry:** the plugin does not send anything to the author or to any third party other than the endpoint you configure.
+
+If you set Base URL to a remote provider, that provider will receive the prompt and surrounding note context every time a macro fires — review their data-retention policy before pointing this plugin at sensitive notes.
 
 ## License
 

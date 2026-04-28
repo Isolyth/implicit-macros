@@ -5,5 +5,6 @@
   "minAppVersion": "1.4.0",
   "description": "Inline AI macros: type !!prompt! and have it expand in place via an OpenAI-compatible chat endpoint.",
   "author": "eriskii",
-  "isDesktopOnly": false
+  "authorUrl": "https://eriskii.net",
+  "isDesktopOnly": true
 }
