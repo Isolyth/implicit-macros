@@ -8,7 +8,6 @@ import {
 } from '@codemirror/view';
 import { EditorState, Extension, Range, StateEffect, StateField } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
-import { SyntaxNode } from '@lezer/common';
 import { StreamCallbacks, StreamHandle } from './api';
 
 // Hooks the plugin supplies to the editor extension. Keeps macros.ts free of
@@ -37,12 +36,13 @@ const CODE_CONTEXT_NODES = new Set([
 ]);
 
 function insideCode(state: EditorState, pos: number): boolean {
-  let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1);
-  while (node) {
+  let node = syntaxTree(state).resolveInner(pos, 1);
+  for (;;) {
     if (CODE_CONTEXT_NODES.has(node.name)) return true;
-    node = node.parent;
+    const parent = node.parent;
+    if (!parent) return false;
+    node = parent;
   }
-  return false;
 }
 
 // ---- braille dot animation ---------------------------------------------
@@ -527,7 +527,7 @@ function makeMacroDetectorPlugin(hooks: MacroHooks) {
           });
         }
         if (fires.length === 0) return;
-        Promise.resolve().then(() => {
+        queueMicrotask(() => {
           for (const f of fires) fireMacro(hooks, view, f);
         });
       }

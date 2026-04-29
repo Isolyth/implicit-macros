@@ -53,7 +53,7 @@ export default class ImplicitMacrosPlugin extends Plugin {
         this.settings.apiKey = plain;
       } else {
         new Notice(
-          'Implicit Macros: stored API key could not be decrypted on this device. Re-enter it in plugin settings.',
+          'Implicit macros: stored API key could not be decrypted on this device. Re-enter it in plugin settings.',
         );
       }
     } else if (typeof raw.apiKey === 'string' && raw.apiKey.length > 0) {
@@ -99,7 +99,7 @@ class MacroSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('API key')
       .setDesc(
-        'OpenAI-compatible API key. Encrypted at rest with a per-device key (the encrypted blob is what lands in data.json). Re-enter on each device.',
+        'API key for an OpenAI-compatible endpoint. Encrypted at rest with a per-device key; the encrypted blob is what lands in data.json. Re-enter on each device.',
       )
       .addText(t => {
         t.inputEl.type = 'password';
@@ -113,7 +113,7 @@ class MacroSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Base URL')
-      .setDesc('OpenAI-compatible chat completions base URL.')
+      .setDesc('Base URL for an OpenAI-compatible chat completions endpoint.')
       .addText(t =>
         t
           .setPlaceholder('https://api.openai.com/v1')
@@ -126,7 +126,7 @@ class MacroSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Model')
-      .setDesc('Chat completions model id.')
+      .setDesc('Chat completions model ID.')
       .addText(t =>
         t
           .setPlaceholder('gpt-4o-mini')
