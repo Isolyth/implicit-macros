@@ -89,8 +89,9 @@ export function streamMacro(
       if (aborted) return;
       let msg = `HTTP ${res.status}`;
       try {
-        const j = JSON.parse(body);
-        if (j?.error?.message) msg = j.error.message;
+        const j = JSON.parse(body) as { error?: { message?: string } };
+        const errMsg = j?.error?.message;
+        if (typeof errMsg === 'string' && errMsg.length > 0) msg = errMsg;
       } catch {
         if (body) msg = `${msg}: ${body.slice(0, 200)}`;
       }
@@ -124,7 +125,9 @@ export function streamMacro(
             const data = line.slice(5).trim();
             if (data === '[DONE]' || data.length === 0) continue;
             try {
-              const j = JSON.parse(data);
+              const j = JSON.parse(data) as {
+                choices?: Array<{ delta?: { content?: unknown } }>;
+              };
               const delta = j?.choices?.[0]?.delta?.content;
               if (typeof delta === 'string' && delta.length > 0) {
                 fullText += delta;

@@ -1,8 +1,8 @@
 {
   "id": "implicit-macros",
   "name": "Implicit Macros",
-  "version": "1.0.0",
-  "minAppVersion": "1.4.0",
+  "version": "1.0.1",
+  "minAppVersion": "1.8.7",
   "description": "Inline AI macros: type !!prompt! and have it expand in place via an OpenAI-compatible chat endpoint.",
   "author": "eriskii",
   "authorUrl": "https://eriskii.net",

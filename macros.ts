@@ -54,9 +54,10 @@ interface DotEntry {
 
 const liveDots: Set<DotEntry> = new Set();
 let frameIndex = 0;
-let intervalHandle: number | null = null;
+let tickScheduled = false;
 
 function tickDots(): void {
+  tickScheduled = false;
   let alive = 0;
   for (const entry of liveDots) {
     if (!entry.el.isConnected) {
@@ -66,19 +67,19 @@ function tickDots(): void {
     entry.el.textContent = BRAILLE_FRAMES[(frameIndex + entry.offset) % BRAILLE_FRAMES.length];
     alive++;
   }
-  if (alive === 0) {
-    if (intervalHandle !== null) {
-      window.clearInterval(intervalHandle);
-      intervalHandle = null;
-    }
-    return;
-  }
+  if (alive === 0) return;
   frameIndex = (frameIndex + 1) % BRAILLE_FRAMES.length;
+  scheduleTick();
+}
+
+function scheduleTick(): void {
+  if (tickScheduled) return;
+  tickScheduled = true;
+  window.setTimeout(tickDots, FRAME_INTERVAL_MS);
 }
 
 function ensureTicker(): void {
-  if (intervalHandle !== null) return;
-  intervalHandle = window.setInterval(tickDots, FRAME_INTERVAL_MS);
+  scheduleTick();
 }
 
 class MacroDotsWidget extends WidgetType {

@@ -40,7 +40,7 @@ let cachedKey: CryptoKey | null = null;
 
 async function getKey(app: App): Promise<CryptoKey> {
   if (cachedKey) return cachedKey;
-  const raw = app.loadLocalStorage(KEY_STORAGE);
+  const raw: unknown = app.loadLocalStorage(KEY_STORAGE);
   let bytes: Uint8Array;
   if (typeof raw !== 'string' || raw.length === 0) {
     bytes = crypto.getRandomValues(new Uint8Array(KEY_BITS / 8));
